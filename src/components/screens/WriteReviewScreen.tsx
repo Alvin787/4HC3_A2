@@ -3,11 +3,11 @@ import { ArrowLeft, Star } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface WriteReviewScreenProps {
   onBack: () => void;
-  onSubmit: () => void;
+  onSubmit: (rating: number, text: string) => void;
 }
 
 export function WriteReviewScreen({ onBack, onSubmit }: WriteReviewScreenProps) {
@@ -20,8 +20,12 @@ export function WriteReviewScreen({ onBack, onSubmit }: WriteReviewScreenProps) 
       toast.error("Please select a rating");
       return;
     }
+    if (reviewText.trim().length < 5) {
+      toast.error("Tell us a bit more about your experience");
+      return;
+    }
     toast.success("Review submitted successfully!");
-    onSubmit();
+    onSubmit(rating, reviewText.trim());
   };
 
   return (

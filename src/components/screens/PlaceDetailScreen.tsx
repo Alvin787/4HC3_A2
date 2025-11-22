@@ -1,22 +1,21 @@
 import React from 'react';
-import { ArrowLeft, Heart, MapPin, Clock, Users, Star, Share2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Heart, MapPin, Users, Star, Share2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { Progress } from '../ui/progress';
 import { BarChart, Bar, XAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
-import { STUDY_SPOTS } from '../../lib/mockData';
+import { StudySpot } from '../../lib/mockData';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 
 interface PlaceDetailScreenProps {
-  placeId: string;
+  spot: StudySpot;
   onBack: () => void;
   onReview: () => void;
+  onToggleFavorite: () => void;
+  onCheckIn: () => void;
 }
 
-export function PlaceDetailScreen({ placeId, onBack, onReview }: PlaceDetailScreenProps) {
-  const spot = STUDY_SPOTS.find(s => s.id === placeId) || STUDY_SPOTS[0];
-  const [isFavorite, setIsFavorite] = React.useState(false);
+export function PlaceDetailScreen({ spot, onBack, onReview, onToggleFavorite, onCheckIn }: PlaceDetailScreenProps) {
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -61,10 +60,10 @@ export function PlaceDetailScreen({ placeId, onBack, onReview }: PlaceDetailScre
           <Button 
             variant="ghost" 
             size="icon" 
-            className={`bg-black/20 hover:bg-black/40 rounded-full ${isFavorite ? 'text-red-500' : 'text-white'}`}
-            onClick={() => setIsFavorite(!isFavorite)}
+            className={`bg-black/20 hover:bg-black/40 rounded-full ${spot.isFavorite ? 'text-red-500' : 'text-white'}`}
+            onClick={onToggleFavorite}
           >
-            <Heart className={`h-5 w-5 ${isFavorite ? 'fill-current' : ''}`} />
+            <Heart className={`h-5 w-5 ${spot.isFavorite ? 'fill-current' : ''}`} />
           </Button>
         </div>
 
@@ -90,9 +89,15 @@ export function PlaceDetailScreen({ placeId, onBack, onReview }: PlaceDetailScre
             <MapPin className="w-4 h-4" />
             Directions
           </Button>
-          <Button variant="outline" className="flex-1 border-blue-200 text-blue-700 hover:bg-blue-50 gap-2">
-            <Users className="w-4 h-4" />
-            Check In
+          <Button 
+            variant="outline" 
+            className={`flex-1 gap-2 border-blue-200 ${spot.checkedIn ? 'text-green-700 bg-green-50 hover:bg-green-50 border-green-200' : 'text-blue-700 hover:bg-blue-50'}`}
+            onClick={() => {
+              if (!spot.checkedIn) onCheckIn();
+            }}
+          >
+            {spot.checkedIn ? <CheckCircle2 className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+            {spot.checkedIn ? 'Checked In' : 'Check In'}
           </Button>
         </div>
       </div>

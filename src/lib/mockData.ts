@@ -19,6 +19,10 @@ export interface StudySpot {
   amenities: string[];
   reviews: Review[];
   occupancyData: { time: string; level: number }[];
+  // UI state set at runtime
+  isFavorite?: boolean;
+  checkedIn?: boolean;
+  lastCheckIn?: string;
 }
 
 export const STUDY_SPOTS: StudySpot[] = [

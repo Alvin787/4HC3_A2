@@ -6,46 +6,119 @@ import { WriteReviewScreen } from './components/screens/WriteReviewScreen';
 import { ProfileScreen } from './components/screens/ProfileScreen';
 import { MapScreen } from './components/screens/MapScreen';
 import { BottomNav } from './components/BottomNav';
+import { STUDY_SPOTS, StudySpot } from './lib/mockData';
+import { toast } from 'sonner';
 
 type Screen = 'home' | 'filter' | 'detail' | 'review' | 'profile' | 'map';
 
+type FilterState = {
+  noiseLevel: 'any' | 'Silent' | 'Quiet' | 'Moderate' | 'Social';
+  amenities: string[];
+  openNow: boolean;
+};
+
 export default function App() {
   const [currentScreen, setCurrentScreen] = React.useState<Screen>('home');
-  const [previousScreen, setPreviousScreen] = React.useState<Screen>('home');
   const [selectedPlaceId, setSelectedPlaceId] = React.useState<string>('');
+  const [detailParent, setDetailParent] = React.useState<Screen>('home');
+  const [spots, setSpots] = React.useState<StudySpot[]>(() => 
+    STUDY_SPOTS.map((spot) => ({ ...spot, isFavorite: false, checkedIn: false }))
+  );
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [activeCategory, setActiveCategory] = React.useState('All');
+  const [filters, setFilters] = React.useState<FilterState>({
+    noiseLevel: 'any',
+    amenities: [],
+    openNow: false
+  });
 
   const navigateTo = (screen: Screen, placeId?: string) => {
-    if (screen !== currentScreen) {
-      setPreviousScreen(currentScreen);
-      setCurrentScreen(screen);
-    }
     if (placeId) {
       setSelectedPlaceId(placeId);
+    }
+    if (screen === 'detail' && currentScreen !== 'review') {
+      setDetailParent(currentScreen);
+    }
+    if (screen !== currentScreen) {
+      setCurrentScreen(screen);
     }
   };
 
   const handleBack = () => {
-    // If we are in review, go back to detail
     if (currentScreen === 'review') {
       setCurrentScreen('detail');
       return;
     }
-    // If we are in detail, go back to home or profile (wherever we came from)
     if (currentScreen === 'detail') {
-      // Default to home if history is lost or it was filter
-      if (previousScreen === 'filter') {
-        setCurrentScreen('home');
-      } else {
-        setCurrentScreen(previousScreen);
-      }
+      setCurrentScreen(detailParent || 'home');
       return;
     }
-    // If filter, go back to home
     if (currentScreen === 'filter') {
       setCurrentScreen('home');
       return;
     }
   };
+
+  const toggleFavorite = (placeId: string) => {
+    setSpots((prev) => prev.map((spot) => 
+      spot.id === placeId ? { ...spot, isFavorite: !spot.isFavorite } : spot
+    ));
+  };
+
+  const handleCheckIn = (placeId: string) => {
+    setSpots((prev) => prev.map((spot) => 
+      spot.id === placeId ? { ...spot, checkedIn: true, lastCheckIn: 'Just now' } : spot
+    ));
+    toast.success('Checked in!');
+  };
+
+  const handleReviewSubmit = (rating: number, text: string) => {
+    if (!selectedPlaceId) return;
+    const newReviewId = `r-${Date.now()}`;
+    setSpots((prev) => prev.map((spot) => 
+      spot.id === selectedPlaceId 
+        ? { 
+            ...spot, 
+            reviews: [
+              { id: newReviewId, user: 'You', rating, text, date: 'Just now' },
+              ...spot.reviews
+            ] 
+          }
+        : spot
+    ));
+    setCurrentScreen('detail');
+  };
+
+  const filteredSpots = React.useMemo(() => {
+    const lowerSearch = searchTerm.trim().toLowerCase();
+    return spots.filter((spot) => {
+      const matchesCategory = activeCategory === 'All' || spot.category === activeCategory;
+      const matchesSearch = 
+        lowerSearch === '' || 
+        spot.name.toLowerCase().includes(lowerSearch) || 
+        spot.description.toLowerCase().includes(lowerSearch);
+
+      const crowdMap = {
+        Silent: 'Quiet',
+        Quiet: 'Quiet',
+        Moderate: 'Moderate',
+        Social: 'Busy'
+      } as const;
+      const matchesNoise = filters.noiseLevel === 'any' 
+        ? true 
+        : crowdMap[filters.noiseLevel] === spot.crowdStatus;
+
+      const matchesAmenities = filters.amenities.length === 0 
+        ? true 
+        : filters.amenities.every((amenity) => 
+            spot.amenities.map((a) => a.toLowerCase()).includes(amenity.toLowerCase())
+          );
+
+      return matchesCategory && matchesSearch && matchesNoise && matchesAmenities;
+    });
+  }, [spots, activeCategory, filters, searchTerm]);
+
+  const activeSpot = spots.find((s) => s.id === selectedPlaceId) || spots[0];
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center">
@@ -55,11 +128,26 @@ export default function App() {
         <div className="flex-1 overflow-hidden relative">
           
           {currentScreen === 'home' && (
-            <HomeScreen onNavigate={navigateTo} />
+            <HomeScreen 
+              spots={filteredSpots}
+              activeCategory={activeCategory}
+              onCategoryChange={setActiveCategory}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onNavigate={navigateTo}
+              onOpenFilters={() => navigateTo('filter')}
+            />
           )}
           
           {currentScreen === 'profile' && (
-            <ProfileScreen onNavigate={navigateTo} />
+            <ProfileScreen 
+              onNavigate={navigateTo} 
+              favorites={spots.filter((spot) => spot.isFavorite)}
+              recent={spots.filter((spot) => spot.checkedIn)}
+              myReviewsCount={spots.reduce((count, spot) => 
+                count + spot.reviews.filter((review) => review.user === 'You').length
+              , 0)}
+            />
           )}
 
           {currentScreen === 'map' && (
@@ -68,25 +156,34 @@ export default function App() {
 
           {currentScreen === 'detail' && (
             <PlaceDetailScreen 
-              placeId={selectedPlaceId} 
+              spot={activeSpot} 
               onBack={handleBack}
               onReview={() => navigateTo('review')}
+              onToggleFavorite={() => toggleFavorite(activeSpot.id)}
+              onCheckIn={() => handleCheckIn(activeSpot.id)}
             />
           )}
 
           {currentScreen === 'review' && (
             <WriteReviewScreen 
               onBack={handleBack}
-              onSubmit={() => {
-                // Simulate submit delay then go back
-                setTimeout(() => handleBack(), 1000);
-              }}
+              onSubmit={handleReviewSubmit}
             />
           )}
 
           {/* Filter Overlay - Rendered on top of Home if needed, or just as a screen */}
           {currentScreen === 'filter' && (
-            <FilterOverlay onClose={handleBack} />
+            <FilterOverlay 
+              onClose={handleBack} 
+              filters={filters}
+              onApply={(nextFilters) => {
+                setFilters(nextFilters);
+                setCurrentScreen('home');
+              }}
+              activeCategory={activeCategory}
+              searchTerm={searchTerm}
+              spots={spots}
+            />
           )}
           
         </div>

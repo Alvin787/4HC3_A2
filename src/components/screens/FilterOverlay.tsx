@@ -2,17 +2,21 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
-import { Label } from '../ui/label';
-import { Slider } from '../ui/slider';
+import { StudySpot } from '../../lib/mockData';
 
 interface FilterOverlayProps {
   onClose: () => void;
+  filters: { noiseLevel: 'any' | 'Silent' | 'Quiet' | 'Moderate' | 'Social'; amenities: string[]; openNow: boolean };
+  onApply: (filters: { noiseLevel: 'any' | 'Silent' | 'Quiet' | 'Moderate' | 'Social'; amenities: string[]; openNow: boolean }) => void;
+  activeCategory: string;
+  searchTerm: string;
+  spots: StudySpot[];
 }
 
-export function FilterOverlay({ onClose }: FilterOverlayProps) {
-  const [noiseLevel, setNoiseLevel] = React.useState('any');
-  const [amenities, setAmenities] = React.useState<string[]>(['wifi']);
-  const [openNow, setOpenNow] = React.useState(true);
+export function FilterOverlay({ onClose, filters, onApply, activeCategory, searchTerm, spots }: FilterOverlayProps) {
+  const [noiseLevel, setNoiseLevel] = React.useState(filters.noiseLevel);
+  const [amenities, setAmenities] = React.useState<string[]>(filters.amenities);
+  const [openNow, setOpenNow] = React.useState(filters.openNow);
 
   const toggleAmenity = (amenity: string) => {
     if (amenities.includes(amenity)) {
@@ -21,6 +25,30 @@ export function FilterOverlay({ onClose }: FilterOverlayProps) {
       setAmenities([...amenities, amenity]);
     }
   };
+
+  const matchingCount = React.useMemo(() => {
+    const lowerSearch = searchTerm.trim().toLowerCase();
+    const crowdMap = {
+      Silent: 'Quiet',
+      Quiet: 'Quiet',
+      Moderate: 'Moderate',
+      Social: 'Busy'
+    } as const;
+
+    return spots.filter((spot) => {
+      const matchesCategory = activeCategory === 'All' || spot.category === activeCategory;
+      const matchesSearch = 
+        lowerSearch === '' || 
+        spot.name.toLowerCase().includes(lowerSearch) || 
+        spot.description.toLowerCase().includes(lowerSearch);
+      const matchesNoise = noiseLevel === 'any' ? true : crowdMap[noiseLevel] === spot.crowdStatus;
+      const matchesAmenities = amenities.length === 0 
+        ? true 
+        : amenities.every((amenity) => spot.amenities.map((a) => a.toLowerCase()).includes(amenity.toLowerCase()));
+      // We assume mock spots are open; toggle reserved for future data.
+      return matchesCategory && matchesSearch && matchesNoise && matchesAmenities;
+    }).length;
+  }, [activeCategory, amenities, noiseLevel, searchTerm, spots]);
 
   return (
     <div className="fixed inset-0 bg-white z-50 flex flex-col animate-in slide-in-from-bottom duration-300">
@@ -101,8 +129,11 @@ export function FilterOverlay({ onClose }: FilterOverlayProps) {
           }}>
             Reset
           </Button>
-          <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={onClose}>
-            Show 12 Spots
+          <Button 
+            className="flex-1 bg-blue-600 hover:bg-blue-700" 
+            onClick={() => onApply({ noiseLevel, amenities, openNow })}
+          >
+            Show {matchingCount} {matchingCount === 1 ? 'Spot' : 'Spots'}
           </Button>
         </div>
       </div>
